@@ -44,51 +44,46 @@ def run_length_encoding(text):
 
     return result
 
+def huffman_encoding(text):
+    freq = {}
+    for char in text:
+        if char in freq:
+            freq[char] += 1
+        else:
+            freq[char] = 1
 
-def huffman_enconding(text):
-    from collections import Counter
-    import heapq
+    freq = {k: v for k, v in sorted(freq.items(), key=lambda item: item[1])}
 
-    class Node:
-        def __init__(self, char, freq):
-            self.char = char
-            self.freq = freq
-            self.left = None
-            self.right = None
+    nodes = list(freq.keys())
+    while len(nodes) > 1:
+        left = nodes.pop(0)
+        right = nodes.pop(0)
+        nodes.append((left, right))
 
-        def __lt__(self, other):
-            return self.freq < other.freq
+    huffman_codes = {}
+    def get_codes(node, code=""):
+        if isinstance(node, str):
+            huffman_codes[node] = code
+        else:
+            get_codes(node[0], code + "0")
+            get_codes(node[1], code + "1")
 
-    def build_huffman_tree(text):
-        frequency = Counter(text)
-        heap = [Node(char, freq) for char, freq in frequency.items()]
-        heapq.heapify(heap)
+    get_codes(nodes[0])
 
-        while len(heap) > 1:
-            left = heapq.heappop(heap)
-            right = heapq.heappop(heap)
+    encoded_text = "".join([huffman_codes[char] for char in text])
 
-            merged = Node(None, left.freq + right.freq)
-            merged.left = left
-            merged.right = right
+    return encoded_text, huffman_codes
 
-            heapq.heappush(heap, merged)
-
-        return heap[0]
-
-    def build_huffman_code(node, prefix="", code={}):
-        if node:
-            if node.char:
-                code[node.char] = prefix
-            build_huffman_code(node.left, prefix + "0", code)
-            build_huffman_code(node.right, prefix + "1", code)
-
-        return code
-
-    root = build_huffman_tree(text)
-    code = build_huffman_code(root)
-
-    return "".join([code[char] for char in text])
+def huffman_decoding(encoded_text, huffman_codes):
+    huffman_codes = {v: k for k, v in huffman_codes.items()}
+    decoded_text = ""
+    code = ""
+    for char in encoded_text:
+        code += char
+        if code in huffman_codes:
+            decoded_text += huffman_codes[code]
+            code = ""
+    return decoded_text
 
 
 def get_hilbert_curve_points(order, norm=True, offset=0.5):
