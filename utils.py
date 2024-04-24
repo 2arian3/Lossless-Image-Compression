@@ -1,5 +1,6 @@
 from PIL import Image
 import numpy as np
+import pickle
 
 
 def get_image_as_array(image_path):
@@ -9,6 +10,11 @@ def get_image_as_array(image_path):
     return image
 
 
+def save_array_as_image(array, image_path):
+    image = Image.fromarray(array)
+    image.save(image_path)
+
+
 def burrows_wheeler_transform(text):
     rotations = [text[i:] + text[:i] for i in range(len(text))]
     rotations.sort()
@@ -16,17 +22,30 @@ def burrows_wheeler_transform(text):
     return "".join([rotation[-1] for rotation in rotations])
 
 
-def move_to_front_transform(text):
-    alphabet = [chr(i) for i in range(256)]
+def move_to_front_encoding(img):
+    alphabet = [i for i in range(256)]
     result = []
 
-    for char in text:
-        index = alphabet.index(char)
+    for value in img:
+        index = alphabet.index(value)
         result.append(index)
+        alphabet.pop(index)
+        alphabet.insert(0, value)
+
+    return np.array(result)
+
+
+def move_to_front_decoding(encoded_img):
+    alphabet = [i for i in range(256)]
+    result = []
+
+    for index in encoded_img:
+        char = alphabet[index]
+        result.append(char)
         alphabet.pop(index)
         alphabet.insert(0, char)
 
-    return result
+    return np.array(result)
 
 
 def run_length_encoding(text):
@@ -43,6 +62,16 @@ def run_length_encoding(text):
     result.append((count, text[-1]))
 
     return result
+
+
+def run_length_decoding(encoded_text):
+    result = []
+
+    for count, char in encoded_text:
+        result.append(char * count)
+
+    return "".join(result)
+
 
 def huffman_encoding(text):
     freq = {}
@@ -62,7 +91,7 @@ def huffman_encoding(text):
 
     huffman_codes = {}
     def get_codes(node, code=""):
-        if isinstance(node, str):
+        if isinstance(node, np.uint8):
             huffman_codes[node] = code
         else:
             get_codes(node[0], code + "0")
@@ -70,37 +99,44 @@ def huffman_encoding(text):
 
     get_codes(nodes[0])
 
-    encoded_text = "".join([huffman_codes[char] for char in text])
+    encoded_text = ''.join([huffman_codes[char] for char in text])
 
     return encoded_text, huffman_codes
 
+
 def huffman_decoding(encoded_text, huffman_codes):
     huffman_codes = {v: k for k, v in huffman_codes.items()}
-    decoded_text = ""
+    decoded_text = []
     code = ""
     for char in encoded_text:
         code += char
         if code in huffman_codes:
-            decoded_text += huffman_codes[code]
+            decoded_text.append(huffman_codes[code])
             code = ""
     return decoded_text
 
 
-def get_hilbert_curve_points(order, norm=True, offset=0.5):
-    N = 2**order
-    points = np.zeros((2, N * N))
-    for i in range(N * N):
-        U = np.array([[0, 0], [0, 1], [1, 1], [1, 0]])   # four points under ORDER=1
-        V = np.array([offset, offset])                   # offset: starting point
-        for j in reversed(range(order)):
-            index = i // 4**j % 4
-            length = 2**j
-            if index == 0:
-                U[1], U[3] = U[3].copy(), U[1].copy() 
-            elif index == 3:
-                U[0], U[2] = U[2].copy(), U[0].copy()
-            V += U[index] * length
-        points[:, i] = V
-    if norm:
-        points /= N
-    return points
+def get_hilbert_curve_points(order, norm=False, offset=0.0):
+    try:
+        with open(f"hilbert_points", "rb") as f:
+            points = pickle.load(f)
+            points = points[order]
+        return points
+    except FileNotFoundError:
+        N = 2**order
+        points = np.zeros((2, N * N))
+        for i in range(N * N):
+            U = np.array([[0, 0], [0, 1], [1, 1], [1, 0]])   # four points under ORDER=1
+            V = np.array([offset, offset])                   # offset: starting point
+            for j in reversed(range(order)):
+                index = i // 4**j % 4
+                length = 2**j
+                if index == 0:
+                    U[1], U[3] = U[3].copy(), U[1].copy() 
+                elif index == 3:
+                    U[0], U[2] = U[2].copy(), U[0].copy()
+                V += U[index] * length
+            points[:, i] = V
+        if norm:
+            points /= N
+        return points
