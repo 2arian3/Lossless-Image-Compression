@@ -23,6 +23,13 @@ def burrows_wheeler_transform(text):
     return "".join([rotation[-1] for rotation in rotations])
 
 
+def inverse_burrows_wheeler_transform(text):
+    table = [""] * len(text)
+    for i in range(len(text)):
+        table = sorted([text[i] + table[i] for i in range(len(text))])
+    return table[text.index("$")]
+
+
 def move_to_front_encoding(img):
     alphabet = [i for i in range(256)]
     result = []
@@ -143,12 +150,35 @@ def huffman_encoding(data):
 def huffman_decoding(data, codes):
     reverse_codes = {v: k for k, v in codes.items()}
     current_code = ""
-    decoded_text = ""
+    decoded_text = []
 
     for bit in data:
         current_code += bit
         if current_code in reverse_codes:
-            decoded_text += reverse_codes[current_code]
+            decoded_text.append(reverse_codes[current_code])
             current_code = ""
     
     return decoded_text
+
+
+def compute_entropy(arr):
+    values, counts = np.unique(arr, return_counts=True)
+    probabilities = counts / counts.sum()
+    entropy = -np.sum(probabilities * np.log2(probabilities))
+
+    return entropy
+
+
+def max_entropy(arr):
+    unique_elements = len(np.unique(arr))
+    if unique_elements > 1:
+        return np.log2(unique_elements)
+    else:
+        return 1
+
+
+def entropy_ratio(arr):
+    entropy = compute_entropy(arr)
+    max_entropy_value = max_entropy(arr)
+
+    return entropy / max_entropy_value if max_entropy_value != 0 else 0

@@ -14,6 +14,9 @@ from utils import (
     run_length_encoding,
     run_length_decoding,
     save_array_as_image,
+    entropy_ratio,
+    burrows_wheeler_transform,
+    inverse_burrows_wheeler_transform
 )
 
 
@@ -45,25 +48,29 @@ def compress_image(image):
     for i in range(image_c):
         huffman_encoded_image[i], huffman_codes[i] = huffman_encoding(encoded_image[:, i])
 
+    huffman_codes_size = 0
+    for codes in huffman_codes:
+        for code in codes.values():
+            huffman_codes_size += len(code) + 8
+
     initial_img_size = image_w * image_h * image_c * 8
-    compressed_img_size = sum([len(huffman_encoded_image[i]) for i in range(image_c)]) + sum([len(huffman_codes[i]) for i in range(image_c)]) * 2 * 8
+    compressed_img_size = sum([len(huffman_encoded_image[i]) for i in range(image_c)]) + huffman_codes_size
 
     print(f"Initial file size: {initial_img_size} bits")
     print(f"Compressed file size: {compressed_img_size} bits")
-    print(f"Compression ratio: {initial_img_size / compressed_img_size:.2f}")
+    print(f"Compression ratio: {initial_img_size / compressed_img_size:.4f}")
+    print(f"Entropy ratio: {entropy_ratio(encoded_image):.4f}")
 
     # with open("compressed_image", "wb") as f:
     #     pickle.dump({
     #         "huffman_encoded_image": huffman_encoded_image,
-    #         "huffman_codes": huffman_codes,
-    #         "order": order
+    #         "huffman_codes": huffman_codes
     #     }, f)
 
 
 def decompress_image(image):
     huffman_encoded_image = image["huffman_encoded_image"]
     huffman_codes = image["huffman_codes"]
-    order = image["order"]
 
     image_c = len(huffman_encoded_image)
 
@@ -74,6 +81,7 @@ def decompress_image(image):
 
     decoded_image = np.array(decoded_image)
 
+    order = np.log2(np.sqrt(decoded_image[0].shape[0])).astype(int)
     N = 2**order
 
     reconstructed_image = np.zeros((N, N, image_c), dtype=np.uint8)
@@ -92,19 +100,29 @@ def decompress_image(image):
 
 
 def main():
-    if len(sys.argv) != 3 or sys.argv[1] not in ["compress", "decompress"] or not os.path.exists(sys.argv[2]):
+    if len(sys.argv) != 3 or sys.argv[1] not in ["compress", "decompress"] or not (os.path.isdir(sys.argv[2]) or os.path.isfile(sys.argv[2])):
         print("Usage: python main.py compress/decompress <image_dir>")
         sys.exit(1)
     
-    image_dir = sys.argv[2]
+    images_dir = sys.argv[2]
+    images = [sys.argv[2]]
+
+
+    if os.path.isdir(images_dir):
+        images = [os.path.join(images_dir, image) for image in os.listdir(images_dir)]
+
+    images.sort()
 
     if sys.argv[1] == "compress":
-        image = get_image_as_array(image_dir)
-        compressed_image = compress_image(image)
+        for image in images:
+            print(f"-------------------\nCompressing {image}")
+            image_array = get_image_as_array(image)
+            compress_image(image_array)
+            print("-------------------")
 
 
     elif sys.argv[1] == "decompress":
-        compressed_image = pickle.load(open(image_dir, "rb"))
+        compressed_image = pickle.load(open(images_dir, "rb"))
         decompressed_image = decompress_image(compressed_image)
 
 
