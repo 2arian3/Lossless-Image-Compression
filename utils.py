@@ -8,6 +8,10 @@ def get_image_as_array(image_path):
     image = Image.open(image_path)
     image = np.asarray(image)
 
+    if image.ndim == 2:
+        # Add an extra dimension to make it 3D
+        image = image[:, :, np.newaxis]
+
     return image
 
 
