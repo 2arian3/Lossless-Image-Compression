@@ -16,7 +16,7 @@ def get_image_as_array(image_path):
 
 
 def save_array_as_image(array, image_path):
-    image = Image.fromarray(array)
+    image = Image.fromarray(array) if array.shape[2] == 3 else Image.fromarray(array[:, :, 0], mode="L")
     image.save(image_path)
 
 
