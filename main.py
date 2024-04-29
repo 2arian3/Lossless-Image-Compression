@@ -24,16 +24,20 @@ def compress_image(image):
     image = image[::-1, :, :] # Flip the image vertically
     image_w, image_h, image_c = image.shape
 
-    order = int(np.log2(max(image_w, image_h)))
+    order = np.ceil(np.log2(max(image_w, image_h))).astype(int)
     N = 2**order
+
+    expanded_image = np.zeros((N, N, image_c), dtype=image.dtype)
+    expanded_image[:image_w, :image_h, :] = image
 
     h_x, h_y = get_hilbert_curve_points(order=order)
     h_x = h_x.astype(int)
     h_y = h_y.astype(int)
 
     linearized_image = np.zeros((N * N, image_c), dtype=np.uint8)
+
     for i in range(N * N):
-        linearized_image[i, :] = image[h_y[i], h_x[i], :]
+        linearized_image[i, :] = expanded_image[h_y[i], h_x[i], :] 
 
     linearized_image_length = linearized_image.shape[0]
 
@@ -61,18 +65,17 @@ def compress_image(image):
     print(f"Compression ratio: {initial_img_size / compressed_img_size:.4f}")
     print(f"Entropy ratio: {entropy_ratio(encoded_image):.4f}")
 
-    # with open("compressed_image", "wb") as f:
-    #     pickle.dump({
-    #         "huffman_encoded_image": huffman_encoded_image,
-    #         "huffman_codes": huffman_codes
-    #     }, f)
+    return {
+        "huffman_encoded_image": huffman_encoded_image,
+        "huffman_codes": huffman_codes,
+        "image_shape": (image_w, image_h, image_c),
+    }
 
 
 def decompress_image(image):
     huffman_encoded_image = image["huffman_encoded_image"]
     huffman_codes = image["huffman_codes"]
-
-    image_c = len(huffman_encoded_image)
+    image_w, image_h, image_c = image["image_shape"]
 
     decoded_image = [[] for _ in range(image_c)]
     for i in range(image_c):
@@ -93,10 +96,10 @@ def decompress_image(image):
     for i in range(N * N):
         reconstructed_image[h_y[i], h_x[i], :] = decoded_image[:, i]
 
+    reconstructed_image = reconstructed_image[:image_w, :image_h, :]
     reconstructed_image = reconstructed_image[::-1, :, :]
 
-    save_array_as_image(reconstructed_image, "decompressed_image.png")
-    
+    return reconstructed_image
 
 
 def main():
@@ -113,17 +116,35 @@ def main():
 
     images.sort()
 
+
+    if not os.path.exists("compressed_images"):
+        os.makedirs("compressed_images")
+
+    
+    if not os.path.exists("decompressed_images"):
+        os.makedirs("decompressed_images")
+
+
     if sys.argv[1] == "compress":
         for image in images:
             print(f"-------------------\nCompressing {image}")
             image_array = get_image_as_array(image)
-            compress_image(image_array)
+            pickle_object = compress_image(image_array)
             print("-------------------")
+
+            pickle.dump(pickle_object, open(f"compressed_images/compressed_{image.split('/')[-1]}.pickle", "wb"))
 
 
     elif sys.argv[1] == "decompress":
-        compressed_image = pickle.load(open(images_dir, "rb"))
-        decompressed_image = decompress_image(compressed_image)
+        for image in images:
+            print(f"-------------------\nDecompressing {image}")
+            compressed_image = pickle.load(open(image, "rb"))
+            decompressed_image = decompress_image(compressed_image)
+            result_dir = f"decompressed_images/decompressed_{image.split('/')[-1].rstrip('.pickle')}.png"
+            print(f"Finished decompressing {image} and the result is saved as {result_dir}")
+            print("-------------------")
+
+            save_array_as_image(decompressed_image, result_dir)
 
 
 if __name__ == "__main__":
